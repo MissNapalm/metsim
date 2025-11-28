@@ -33,6 +33,8 @@
             position: fixed;
             width: 100%;
             transition: background 0.3s, color 0.3s;
+            /* Prevent content from being pushed up by keyboard */
+            overscroll-behavior: none;
         }
 
         body.futuristic {
@@ -129,6 +131,9 @@
             display: flex;
             gap: 8px;
             z-index: 2000;
+            /* Keep controls in viewport when keyboard opens */
+            transform: translateZ(0);
+            backface-visibility: hidden;
         }
 
         .control-btn {
@@ -168,6 +173,8 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            min-height: 0; /* Allow flex items to shrink below content size */
+            position: relative;
         }
 
         .terminal-output {
@@ -175,11 +182,15 @@
             overflow-y: auto;
             overflow-x: hidden;
             padding: 8px;
+            padding-top: 50px; /* Space for controls */
             font-size: var(--font-size);
             line-height: 1.3;
             -webkit-overflow-scrolling: touch;
             font-family: monospace;
             word-wrap: break-word;
+            min-height: 0; /* Allow shrinking */
+            /* Ensure scrolling works with keyboard */
+            overscroll-behavior: contain;
         }
 
         .terminal-output::-webkit-scrollbar {
@@ -197,6 +208,9 @@
             padding: 8px;
             background: var(--bg);
             transition: opacity 0.2s;
+            flex-shrink: 0; /* Don't allow input to shrink */
+            position: relative;
+            z-index: 100;
         }
 
         .prompt {
@@ -1097,6 +1111,24 @@ Type 'exit' to return to Metasploit.`
         }
 
         const terminal = new Terminal();
+
+        // Handle viewport resize when keyboard opens/closes
+        let lastHeight = window.innerHeight;
+        window.addEventListener('resize', () => {
+            const currentHeight = window.innerHeight;
+            // If height decreased significantly, keyboard likely opened
+            if (currentHeight < lastHeight * 0.7) {
+                terminal.scrollToBottom();
+            }
+            lastHeight = currentHeight;
+        });
+
+        // Handle visual viewport changes (better keyboard detection on iOS)
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                terminal.scrollToBottom();
+            });
+        }
 
         document.addEventListener('click', () => {
             terminal.input.focus();
