@@ -27,14 +27,16 @@
             font-size: var(--font-size);
             background: var(--bg);
             color: var(--fg);
-            height: 100vh;
-            height: 100dvh;
-            overflow: hidden;
-            position: fixed;
             width: 100%;
             transition: background 0.3s, color 0.3s;
-            /* Prevent content from being pushed up by keyboard */
-            overscroll-behavior: none;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        html {
+            height: 100%;
+            overflow: hidden;
         }
 
         body.futuristic {
@@ -172,9 +174,12 @@
         .terminal-container {
             display: flex;
             flex-direction: column;
-            height: 100%;
-            min-height: 0; /* Allow flex items to shrink below content size */
-            position: relative;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            min-height: 0;
         }
 
         .terminal-output {
@@ -370,9 +375,39 @@
                 this.hintText = document.getElementById('hintText');
                 this.printInstant(WELCOME, 'banner');
                 this.setupEventListeners();
+                this.setupZoomControls();
+                this.setupViewportHandler();
                 this.input.focus();
                 this.startHintTimer();
-                this.setupZoomControls();
+            }
+
+            setupViewportHandler() {
+                // Handle visual viewport changes for mobile keyboard
+                const updateViewport = () => {
+                    if (window.visualViewport) {
+                        const viewport = window.visualViewport;
+                        const container = document.querySelector('.terminal-container');
+                        
+                        // Resize container to match visual viewport
+                        container.style.height = viewport.height + 'px';
+                        container.style.transform = `translateY(${viewport.offsetTop}px)`;
+                        
+                        // Scroll to bottom when keyboard opens
+                        this.scrollToBottom();
+                    }
+                };
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', updateViewport);
+                    window.visualViewport.addEventListener('scroll', updateViewport);
+                    // Initial setup
+                    updateViewport();
+                }
+
+                // Fallback for older browsers
+                window.addEventListener('resize', () => {
+                    this.scrollToBottom();
+                });
             }
 
             setupZoomControls() {
@@ -1111,24 +1146,6 @@ Type 'exit' to return to Metasploit.`
         }
 
         const terminal = new Terminal();
-
-        // Handle viewport resize when keyboard opens/closes
-        let lastHeight = window.innerHeight;
-        window.addEventListener('resize', () => {
-            const currentHeight = window.innerHeight;
-            // If height decreased significantly, keyboard likely opened
-            if (currentHeight < lastHeight * 0.7) {
-                terminal.scrollToBottom();
-            }
-            lastHeight = currentHeight;
-        });
-
-        // Handle visual viewport changes (better keyboard detection on iOS)
-        if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', () => {
-                terminal.scrollToBottom();
-            });
-        }
 
         document.addEventListener('click', () => {
             terminal.input.focus();
