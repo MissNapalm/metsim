@@ -350,7 +350,7 @@
                 this.step = 0;
                 this.msfMode = false;
                 this.shellMode = false;
-                this.currentModule = 0;
+                this.currentModule = -1;
                 this.currentDir = '/root';
                 this.commandHistory = [];
                 this.historyIndex = -1;
@@ -368,7 +368,25 @@
                 this.lastInputTime = Date.now();
                 this.fontSize = 14;
                 
+                // Randomize exploit order - shuffle the array
+                this.exploits = [
+                    { name: 'vsftpd_auth_bypass', date: '2010-04-08', rank: 'normal', check: 'Yes', desc: 'VSFTPD Authentication Bypass', working: false },
+                    { name: 'vsftpd_download_exec', date: '2011-02-14', rank: 'good', check: 'No', desc: 'VSFTPD Download Command Execution', working: false },
+                    { name: 'vsftpd_234_backdoor', date: '2011-07-03', rank: 'excellent', check: 'No', desc: 'VSFTPD v2.3.4 Backdoor Command Execution', working: true }
+                ];
+                this.shuffleExploits();
+                
                 this.init();
+            }
+
+            shuffleExploits() {
+                // Fisher-Yates shuffle algorithm
+                for (let i = this.exploits.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.exploits[i], this.exploits[j]] = [this.exploits[j], this.exploits[i]];
+                }
+                // Find which index has the working exploit
+                this.workingExploitIndex = this.exploits.findIndex(e => e.working);
             }
 
             init() {
@@ -467,12 +485,8 @@
                     this.promptText.textContent = '';
                 } else if (this.msfMode) {
                     if (this.step >= 4 && this.currentModule >= 0) {
-                        const moduleNames = [
-                            'vsftpd_auth_bypass',
-                            'vsftpd_download_exec',
-                            'vsftpd_234_backdoor'
-                        ];
-                        this.promptText.textContent = `msf6 exploit(unix/ftp/${moduleNames[this.currentModule]}) >`;
+                        const exploitName = this.exploits[this.currentModule].name;
+                        this.promptText.textContent = `msf6 exploit(unix/ftp/${exploitName}) >`;
                     } else {
                         this.promptText.textContent = 'msf6 >';
                     }
@@ -550,10 +564,12 @@ Start the Metasploit Framework:
 Search for the vsftpd exploit module:
   search vsftpd`,
                     3: `[NEXT STEP]
-Load the vsftpd backdoor exploit (choose the one with "excellent" rank):
-  use 0
+Load one of the vsftpd exploits to test it:
+  use 0 (or use 1, or use 2)
   or
-  use exploit/unix/ftp/vsftpd_234_backdoor`,
+  use exploit/unix/ftp/vsftpd_[module_name]
+  
+Note: You may need to try different exploits to find one that works!`,
                     4: `[NEXT STEP]
 Set the target IP address (you can skip 'show options'):
   set RHOSTS 10.10.10.10
@@ -567,7 +583,9 @@ Set the target IP address (use RHOSTS, not RHOST):
 Launch the exploit:
   exploit
   or
-  run`,
+  run
+  
+If it fails, go back and try a different exploit module.`,
                     7: `[EXPLOITATION COMPLETE]
 You now have a root shell on the target system.
 Try commands like:
@@ -588,7 +606,7 @@ Type 'exit' to return to Metasploit.`
                     0: 'nmap -sV 10.10.10.10',
                     1: 'msfconsole',
                     2: 'search vsftpd',
-                    3: 'use 2',
+                    3: 'use 0',
                     4: 'set RHOSTS 10.10.10.10',
                     5: 'set RHOSTS 10.10.10.10',
                     6: 'exploit',
@@ -602,7 +620,7 @@ Type 'exit' to return to Metasploit.`
                     0: 'nmap -sV 10.10.10.10',
                     1: 'msfconsole',
                     2: 'search vsftpd',
-                    3: 'Select an exploit! use [exploit number] example: use 1',
+                    3: 'Try: use 0, use 1, or use 2',
                     4: 'set RHOSTS 10.10.10.10',
                     5: 'set RHOSTS 10.10.10.10',
                     6: 'exploit',
@@ -795,18 +813,30 @@ Type 'exit' to return to Metasploit.`
                     case 3:
                         if (!this.msfMode) {
                             await this.printLine(`bash: ${cmd}: command not found`);
-                        } else if (lower.startsWith('use') && (lower.includes('vsftpd_234_backdoor') || lower.includes('use 2'))) {
-                            this.step = 4;
-                            this.currentModule = 2;
-                            this.updatePrompt();
-                        } else if (lower.startsWith('use') && (lower.includes('0') || lower.includes('auth_bypass'))) {
-                            this.step = 4;
-                            this.currentModule = 0;
-                            this.updatePrompt();
-                        } else if (lower.startsWith('use') && (lower.includes('1') || lower.includes('download_exec'))) {
-                            this.step = 4;
-                            this.currentModule = 1;
-                            this.updatePrompt();
+                        } else if (lower.startsWith('use')) {
+                            let selectedModule = -1;
+                            
+                            // Check if using numeric index
+                            if (lower.match(/^use\s+[0-2]$/)) {
+                                selectedModule = parseInt(lower.split(/\s+/)[1]);
+                            }
+                            // Check if using full module name
+                            else {
+                                for (let i = 0; i < this.exploits.length; i++) {
+                                    if (lower.includes(this.exploits[i].name)) {
+                                        selectedModule = i;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (selectedModule >= 0 && selectedModule <= 2) {
+                                this.step = 4;
+                                this.currentModule = selectedModule;
+                                this.updatePrompt();
+                            } else {
+                                await this.printLine('[-] Invalid module');
+                            }
                         } else if (lower.startsWith('search') && lower.includes('vsftpd')) {
                             await this.searchModules();
                         } else if (lower.startsWith('search')) {
@@ -814,8 +844,6 @@ Type 'exit' to return to Metasploit.`
                             await this.printLine('Matching Modules');
                             await this.printLine('================');
                             await this.printLine('');
-                        } else if (lower.startsWith('use')) {
-                            await this.printLine('[-] Invalid module');
                         } else {
                             await this.printLine(`[-] Unknown command: ${cmd}.`);
                         }
@@ -865,26 +893,38 @@ Type 'exit' to return to Metasploit.`
                         await this.printLine(`${parts[1]} => ${parts.slice(2).join(' ')}`);
                     }
                 } else if (lower === 'exploit' || lower === 'run') {
-                    if (this.currentModule === 2) {
+                    // Check if current module is the working one
+                    if (this.currentModule === this.workingExploitIndex) {
                         await this.runExploit();
                         this.shellMode = true;
                         this.msfMode = false;
                         this.step = 7;
                         this.updatePrompt();
-                    } else if (this.currentModule === 0) {
-                        await this.runFailedExploit1();
-                    } else if (this.currentModule === 1) {
-                        await this.runFailedExploit2();
+                    } else {
+                        await this.runFailedExploit();
+                        await this.printLine('');
+                        await this.printLine('[TIP] This exploit didn\'t work. Type "back" to return and try a different module.');
                     }
                 } else if (lower.startsWith('use')) {
-                    if (lower.includes('vsftpd_234_backdoor') || lower.includes('use 2')) {
-                        this.currentModule = 2;
-                    } else if (lower.includes('0') || lower.includes('auth_bypass')) {
-                        this.currentModule = 0;
-                    } else if (lower.includes('1') || lower.includes('download_exec')) {
-                        this.currentModule = 1;
+                    let selectedModule = -1;
+                    
+                    if (lower.match(/^use\s+[0-2]$/)) {
+                        selectedModule = parseInt(lower.split(/\s+/)[1]);
+                    } else {
+                        for (let i = 0; i < this.exploits.length; i++) {
+                            if (lower.includes(this.exploits[i].name)) {
+                                selectedModule = i;
+                                break;
+                            }
+                        }
                     }
-                    this.updatePrompt();
+                    
+                    if (selectedModule >= 0 && selectedModule <= 2) {
+                        this.currentModule = selectedModule;
+                        this.updatePrompt();
+                    } else {
+                        await this.printLine('[-] Invalid module');
+                    }
                 } else if (lower.startsWith('search') && lower.includes('vsftpd')) {
                     await this.searchModules();
                 } else if (lower.startsWith('show')) {
@@ -955,17 +995,24 @@ Type 'exit' to return to Metasploit.`
                 await this.printLine('');
                 await this.printLine('   #  Name                                  Disclosure Date  Rank       Check  Description');
                 await this.printLine('   -  ----                                  ---------------  ----       -----  -----------');
-                await this.printLine('   0  exploit/unix/ftp/vsftpd_auth_bypass   2010-04-08       normal     Yes    VSFTPD Authentication Bypass');
-                await this.printLine('   1  exploit/unix/ftp/vsftpd_download_exec 2011-02-14       good       No     VSFTPD Download Command Execution');
-                await this.printLine('   2  exploit/unix/ftp/vsftpd_234_backdoor  2011-07-03       excellent  No     VSFTPD v2.3.4 Backdoor Command Execution');
+                
+                // Display exploits in randomized order
+                for (let i = 0; i < this.exploits.length; i++) {
+                    const exp = this.exploits[i];
+                    await this.printLine(`   ${i}  exploit/unix/ftp/${exp.name.padEnd(25)} ${exp.date}  ${exp.rank.padEnd(10)} ${exp.check.padEnd(6)} ${exp.desc}`);
+                }
+                
                 await this.printLine('');
                 await this.printLine('');
-                await this.printLine('Interact with a module by name or index. For example info 2, use 2 or use exploit/unix/ftp/vsftpd_234_backdoor');
+                await this.printLine('Interact with a module by name or index. For example info 0, use 0 or use exploit/unix/ftp/[module_name]');
+                await this.printLine('');
+                await this.printLine('[TIP] Try different exploits - not all of them will work on this target!');
             }
 
             async showOptions() {
                 await this.printLine('');
-                await this.printLine('Module options (exploit/unix/ftp/vsftpd_234_backdoor):');
+                const exploitName = this.exploits[this.currentModule].name;
+                await this.printLine(`Module options (exploit/unix/ftp/${exploitName}):`);
                 await this.printLine('');
                 await this.printLine('   Name    Current Setting  Required  Description');
                 await this.printLine('   ----    ---------------  --------  -----------');
@@ -1015,7 +1062,9 @@ Type 'exit' to return to Metasploit.`
                 await this.printLine('');
             }
 
-            async runFailedExploit1() {
+            async runFailedExploit() {
+                const exploitName = this.exploits[this.currentModule].name;
+                
                 await this.printLine('[*] Started reverse TCP handler on 192.168.1.100:4444');
                 await this.sleep(800);
                 await this.printLine('[*] 10.10.10.10:21 - Attempting to connect to FTP service...');
@@ -1024,24 +1073,21 @@ Type 'exit' to return to Metasploit.`
                 await this.sleep(700);
                 await this.printLine('[*] 10.10.10.10:21 - Banner: 220 (vsFTPd 2.3.4)');
                 await this.sleep(900);
-                await this.printLine('[*] 10.10.10.10:21 - Attempting authentication bypass...');
-                await this.sleep(1500);
-                await this.printLine('[-] 10.10.10.10:21 - Exploit failed: Authentication method not supported by this version');
-                await this.printLine('[-] Exploit aborted due to failure');
-            }
-
-            async runFailedExploit2() {
-                await this.printLine('[*] Started reverse TCP handler on 192.168.1.100:4444');
-                await this.sleep(800);
-                await this.printLine('[*] 10.10.10.10:21 - Attempting to connect to FTP service...');
-                await this.sleep(1000);
-                await this.printLine('[*] 10.10.10.10:21 - Connected to target FTP server');
-                await this.sleep(700);
-                await this.printLine('[*] 10.10.10.10:21 - Banner: 220 (vsFTPd 2.3.4)');
-                await this.sleep(900);
-                await this.printLine('[*] 10.10.10.10:21 - Checking for download feature...');
-                await this.sleep(1400);
-                await this.printLine('[-] 10.10.10.10:21 - Exploit failed: Download feature not enabled on target');
+                
+                if (exploitName.includes('auth_bypass')) {
+                    await this.printLine('[*] 10.10.10.10:21 - Attempting authentication bypass...');
+                    await this.sleep(1500);
+                    await this.printLine('[-] 10.10.10.10:21 - Exploit failed: Authentication method not supported by this version');
+                } else if (exploitName.includes('download_exec')) {
+                    await this.printLine('[*] 10.10.10.10:21 - Checking for download feature...');
+                    await this.sleep(1400);
+                    await this.printLine('[-] 10.10.10.10:21 - Exploit failed: Download feature not enabled on target');
+                } else {
+                    await this.printLine('[*] 10.10.10.10:21 - Sending exploit payload...');
+                    await this.sleep(1500);
+                    await this.printLine('[-] 10.10.10.10:21 - Exploit failed: Target not vulnerable to this attack vector');
+                }
+                
                 await this.printLine('[-] Exploit aborted due to failure');
             }
 
