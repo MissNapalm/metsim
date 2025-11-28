@@ -19,11 +19,12 @@
             --fg: #ffffff;
             --prompt: #ffffff;
             --banner: #888888;
+            --font-size: 14px;
         }
 
         body {
             font-family: 'Courier New', 'Courier', monospace;
-            font-size: 14px;
+            font-size: var(--font-size);
             background: var(--bg);
             color: var(--fg);
             height: 100vh;
@@ -121,6 +122,48 @@
             }
         }
 
+        .controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 8px;
+            z-index: 2000;
+        }
+
+        .control-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            color: var(--fg);
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: all 0.15s;
+            font-family: monospace;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-btn:active {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(0.95);
+        }
+
+        body.futuristic .control-btn {
+            background: rgba(88, 166, 255, 0.08);
+            border-color: rgba(88, 166, 255, 0.2);
+        }
+
+        body.futuristic .control-btn:active {
+            background: rgba(88, 166, 255, 0.15);
+        }
+
         .terminal-container {
             display: flex;
             flex-direction: column;
@@ -130,11 +173,13 @@
         .terminal-output {
             flex: 1;
             overflow-y: auto;
+            overflow-x: hidden;
             padding: 8px;
-            font-size: 13px;
+            font-size: var(--font-size);
             line-height: 1.3;
             -webkit-overflow-scrolling: touch;
             font-family: monospace;
+            word-wrap: break-word;
         }
 
         .terminal-output::-webkit-scrollbar {
@@ -144,6 +189,7 @@
         .output-line {
             white-space: pre-wrap;
             word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .terminal-input-line {
@@ -158,6 +204,7 @@
             margin-right: 4px;
             white-space: nowrap;
             transition: color 0.3s;
+            font-size: var(--font-size);
         }
 
         body.futuristic .prompt {
@@ -180,7 +227,7 @@
             border: none;
             color: var(--fg);
             font-family: monospace;
-            font-size: 13px;
+            font-size: var(--font-size);
             outline: none;
             caret-color: var(--fg);
             transition: color 0.3s;
@@ -195,7 +242,7 @@
             color: var(--fg);
             opacity: 0.3;
             font-family: monospace;
-            font-size: 13px;
+            font-size: var(--font-size);
             pointer-events: none;
             white-space: pre;
             z-index: 1;
@@ -240,6 +287,12 @@
     </style>
 </head>
 <body>
+    <div class="controls">
+        <button class="control-btn" id="zoomOut" title="Decrease font size">−</button>
+        <button class="control-btn" id="zoomIn" title="Increase font size">+</button>
+        <button class="control-btn" id="tabBtn" title="Autocomplete">⇥</button>
+    </div>
+
     <div class="terminal-container">
         <div class="terminal-output" id="output"></div>
         <div class="terminal-input-line" id="inputLine">
@@ -259,20 +312,18 @@
     </div>
 
     <script>
-        const WELCOME = `╔══════════════════════════════════════════════════════════╗
-║                                                          ║
-║              Welcome to MetaSim v1.0                     ║
-║        Educational Penetration Testing Simulation        ║
-║                                                          ║
-║  This is a training environment for learning ethical     ║
-║  hacking workflows. No real attacks are performed.       ║
-║                                                          ║
-║  Type commands as you would in a real terminal.          ║
-║  Start with: nmap -sV 10.10.10.10                        ║
-║                                                          ║
-║  Type 'theme' to toggle futuristic mode                  ║
-║                                                          ║
-╚══════════════════════════════════════════════════════════╝
+        const WELCOME = `
+              Welcome to MetaSim v1.0
+        Educational Penetration Testing Simulation
+
+  This is a training environment for learning ethical
+  hacking workflows. No real attacks are performed.
+
+  Type commands as you would in a real terminal.
+  Start with: nmap -sV 10.10.10.10
+
+  Type 'theme' to toggle futuristic mode
+
 `;
 
         class Terminal {
@@ -296,6 +347,7 @@
                 this.nmapTotalTime = 0;
                 this.hintTimeout = null;
                 this.lastInputTime = Date.now();
+                this.fontSize = 14;
                 
                 this.init();
             }
@@ -306,6 +358,27 @@
                 this.setupEventListeners();
                 this.input.focus();
                 this.startHintTimer();
+                this.setupZoomControls();
+            }
+
+            setupZoomControls() {
+                document.getElementById('zoomIn').addEventListener('click', () => {
+                    this.fontSize = Math.min(this.fontSize + 1, 24);
+                    this.updateFontSize();
+                });
+
+                document.getElementById('zoomOut').addEventListener('click', () => {
+                    this.fontSize = Math.max(this.fontSize - 1, 10);
+                    this.updateFontSize();
+                });
+
+                document.getElementById('tabBtn').addEventListener('click', () => {
+                    this.autocomplete();
+                });
+            }
+
+            updateFontSize() {
+                document.documentElement.style.setProperty('--font-size', this.fontSize + 'px');
             }
 
             setupEventListeners() {
@@ -345,7 +418,6 @@
                     this.promptText.textContent = '';
                 } else if (this.msfMode) {
                     if (this.step >= 4 && this.currentModule >= 0) {
-                        // Show exploit name in prompt based on which module is loaded
                         const moduleNames = [
                             'vsftpd_auth_bypass',
                             'vsftpd_download_exec',
@@ -353,7 +425,6 @@
                         ];
                         this.promptText.textContent = `msf6 exploit(unix/ftp/${moduleNames[this.currentModule]}) >`;
                     } else {
-                        // Generic msf6 prompt before selecting exploit or after back
                         this.promptText.textContent = 'msf6 >';
                     }
                 } else {
@@ -399,7 +470,6 @@
             }
 
             sleep(ms) {
-                // Add random variation to sleep times for realism (±20%)
                 const variation = ms * 0.2;
                 const randomMs = ms + (Math.random() * variation * 2 - variation);
                 return new Promise(resolve => setTimeout(resolve, randomMs));
@@ -504,13 +574,12 @@ Type 'exit' to return to Metasploit.`
                 if (this.hintTimeout) {
                     clearTimeout(this.hintTimeout);
                 }
-                // Don't start timer if processing or scanning
                 if (this.isProcessing || this.nmapScanning) {
                     return;
                 }
                 this.hintTimeout = setTimeout(() => {
                     this.updateHint();
-                }, 6000); // 6 seconds
+                }, 6000);
             }
 
             updateHint() {
@@ -523,7 +592,6 @@ Type 'exit' to return to Metasploit.`
                     return;
                 }
 
-                // Step 3 is instructional - show full hint, not insert mode
                 if (this.step === 3) {
                     if (!currentValue) {
                         this.hintText.textContent = hintText;
@@ -534,14 +602,12 @@ Type 'exit' to return to Metasploit.`
                     return;
                 }
 
-                // Show only the remaining part of the command (insert mode behavior)
                 if (nextCmd && nextCmd.startsWith(currentValue)) {
                     const remaining = nextCmd.substring(currentValue.length);
                     this.hintText.textContent = remaining;
-                    // Position hint text to start right after the typed text
                     const canvas = document.createElement('canvas');
                     const context = canvas.getContext('2d');
-                    context.font = '13px monospace';
+                    context.font = this.fontSize + 'px monospace';
                     const textWidth = context.measureText(currentValue).width;
                     this.hintText.style.paddingLeft = textWidth + 'px';
                 } else {
@@ -575,7 +641,6 @@ Type 'exit' to return to Metasploit.`
             async handleCommand() {
                 const cmd = this.input.value.trim();
                 
-                // If nmap is scanning and user hits enter, show progress
                 if (this.nmapScanning && !cmd) {
                     const elapsed = Date.now() - this.nmapStartTime;
                     const progress = Math.min(Math.floor((elapsed / this.nmapTotalTime) * 100), 99);
@@ -594,7 +659,6 @@ Type 'exit' to return to Metasploit.`
 
                 if (!cmd) return;
 
-                // Check for theme command
                 if (cmd.toLowerCase() === 'theme') {
                     this.toggleTheme();
                     return;
@@ -608,7 +672,6 @@ Type 'exit' to return to Metasploit.`
             async processCommand(cmd) {
                 const lower = cmd.toLowerCase();
 
-                // Exit handling
                 if (lower === 'exit' || lower === 'quit') {
                     if (this.shellMode) {
                         await this.printLine('exit');
@@ -627,25 +690,22 @@ Type 'exit' to return to Metasploit.`
                     }
                 }
 
-                // Clear
                 if (lower === 'clear') {
                     this.output.innerHTML = '';
                     return;
                 }
 
-                // Help
                 if (lower === 'help') {
                     this.showHelp();
                     return;
                 }
 
-                // Step-based logic
                 await this.handleStepCommand(cmd, lower);
             }
 
             async handleStepCommand(cmd, lower) {
                 switch (this.step) {
-                    case 0: // Nmap
+                    case 0:
                         if (lower.startsWith('nmap')) {
                             await this.runNmapScan();
                             this.step = 1;
@@ -654,7 +714,7 @@ Type 'exit' to return to Metasploit.`
                         }
                         break;
 
-                    case 1: // Start Metasploit or run nmap again
+                    case 1:
                         if (lower === 'msfconsole') {
                             await this.startMetasploit();
                             this.msfMode = true;
@@ -667,7 +727,7 @@ Type 'exit' to return to Metasploit.`
                         }
                         break;
 
-                    case 2: // Search
+                    case 2:
                         if (!this.msfMode) {
                             await this.printLine(`bash: ${cmd}: command not found`);
                         } else if (lower.startsWith('search') && lower.includes('vsftpd')) {
@@ -683,7 +743,7 @@ Type 'exit' to return to Metasploit.`
                         }
                         break;
 
-                    case 3: // Use module or search again
+                    case 3:
                         if (!this.msfMode) {
                             await this.printLine(`bash: ${cmd}: command not found`);
                         } else if (lower.startsWith('use') && (lower.includes('vsftpd_234_backdoor') || lower.includes('use 2'))) {
@@ -712,131 +772,13 @@ Type 'exit' to return to Metasploit.`
                         }
                         break;
 
-                    case 4: // Show options or set RHOSTS directly
-                        if (!this.msfMode) {
-                            await this.printLine(`bash: ${cmd}: command not found`);
-                        } else if (lower === 'back') {
-                            // Go back to search results
-                            this.step = 3;
-                            this.currentModule = -1;
-                            this.updatePrompt();
-                        } else if (lower === 'show options' || lower === 'options') {
-                            await this.showOptions();
-                            this.step = 5;
-                        } else if (lower.startsWith('set rhosts')) {
-                            if (lower.includes('10.10.10.10')) {
-                                await this.printLine('RHOSTS => 10.10.10.10');
-                                this.step = 6;
-                            } else {
-                                const ip = cmd.split(/\s+/)[2];
-                                await this.printLine(`RHOSTS => ${ip}`);
-                                this.step = 6;
-                            }
-                        } else if (lower.startsWith('set')) {
-                            const parts = cmd.split(/\s+/);
-                            if (parts.length >= 3) {
-                                await this.printLine(`${parts[1]} => ${parts.slice(2).join(' ')}`);
-                            }
-                        } else if (lower.startsWith('use') && (lower.includes('vsftpd_234_backdoor') || lower.includes('use 2'))) {
-                            this.currentModule = 2;
-                            this.updatePrompt();
-                        } else if (lower.startsWith('use') && (lower.includes('0') || lower.includes('auth_bypass'))) {
-                            this.currentModule = 0;
-                            this.updatePrompt();
-                        } else if (lower.startsWith('use') && (lower.includes('1') || lower.includes('download_exec'))) {
-                            this.currentModule = 1;
-                            this.updatePrompt();
-                        } else if (lower.startsWith('search') && lower.includes('vsftpd')) {
-                            await this.searchModules();
-                        } else if (lower.startsWith('show')) {
-                            await this.printLine('');
-                        } else {
-                            await this.printLine(`[-] Unknown command: ${cmd}.`);
-                        }
+                    case 4:
+                    case 5:
+                    case 6:
+                        await this.handleMsfCommand(cmd, lower);
                         break;
 
-                    case 5: // Set RHOSTS or show options again
-                        if (!this.msfMode) {
-                            await this.printLine(`bash: ${cmd}: command not found`);
-                        } else if (lower === 'back') {
-                            // Go back to search results
-                            this.step = 3;
-                            this.currentModule = -1;
-                            this.updatePrompt();
-                        } else if (lower.startsWith('set rhosts')) {
-                            if (lower.includes('10.10.10.10')) {
-                                await this.printLine('RHOSTS => 10.10.10.10');
-                                this.step = 6;
-                            } else {
-                                const ip = cmd.split(/\s+/)[2];
-                                await this.printLine(`RHOSTS => ${ip}`);
-                            }
-                        } else if (lower.startsWith('set')) {
-                            const parts = cmd.split(/\s+/);
-                            if (parts.length >= 3) {
-                                await this.printLine(`${parts[1]} => ${parts.slice(2).join(' ')}`);
-                            }
-                        } else if (lower === 'show options' || lower === 'options') {
-                            await this.showOptions();
-                        } else if (lower.startsWith('use') && (lower.includes('vsftpd_234_backdoor') || lower.includes('use 2'))) {
-                            this.currentModule = 2;
-                            this.updatePrompt();
-                        } else if (lower.startsWith('use') && (lower.includes('0') || lower.includes('auth_bypass'))) {
-                            this.currentModule = 0;
-                            this.updatePrompt();
-                        } else if (lower.startsWith('use') && (lower.includes('1') || lower.includes('download_exec'))) {
-                            this.currentModule = 1;
-                            this.updatePrompt();
-                        } else {
-                            await this.printLine(`[-] Unknown command: ${cmd}.`);
-                        }
-                        break;
-
-                    case 6: // Exploit or continue setting options
-                        if (!this.msfMode) {
-                            await this.printLine(`bash: ${cmd}: command not found`);
-                        } else if (lower === 'back') {
-                            // Go back to search results
-                            this.step = 3;
-                            this.currentModule = -1;
-                            this.updatePrompt();
-                        } else if (lower === 'exploit' || lower === 'run') {
-                            if (this.currentModule === 2) {
-                                // Correct module - run successful exploit
-                                await this.runExploit();
-                                this.shellMode = true;
-                                this.msfMode = false;
-                                this.step = 7;
-                                this.updatePrompt();
-                            } else if (this.currentModule === 0) {
-                                // Auth bypass module - fails
-                                await this.runFailedExploit1();
-                            } else if (this.currentModule === 1) {
-                                // Download exec module - fails
-                                await this.runFailedExploit2();
-                            }
-                        } else if (lower.startsWith('set')) {
-                            const parts = cmd.split(/\s+/);
-                            if (parts.length >= 3) {
-                                await this.printLine(`${parts[1]} => ${parts.slice(2).join(' ')}`);
-                            }
-                        } else if (lower === 'show options' || lower === 'options') {
-                            await this.showOptionsWithRHOSTS();
-                        } else if (lower.startsWith('use') && (lower.includes('vsftpd_234_backdoor') || lower.includes('use 2'))) {
-                            this.currentModule = 2;
-                            this.updatePrompt();
-                        } else if (lower.startsWith('use') && (lower.includes('0') || lower.includes('auth_bypass'))) {
-                            this.currentModule = 0;
-                            this.updatePrompt();
-                        } else if (lower.startsWith('use') && (lower.includes('1') || lower.includes('download_exec'))) {
-                            this.currentModule = 1;
-                            this.updatePrompt();
-                        } else {
-                            await this.printLine(`[-] Unknown command: ${cmd}.`);
-                        }
-                        break;
-
-                    case 7: // Shell
+                    case 7:
                         if (this.shellMode) {
                             await this.handleShellCommand(cmd, lower);
                         } else {
@@ -849,28 +791,74 @@ Type 'exit' to return to Metasploit.`
                 }
             }
 
+            async handleMsfCommand(cmd, lower) {
+                if (!this.msfMode) {
+                    await this.printLine(`bash: ${cmd}: command not found`);
+                } else if (lower === 'back') {
+                    this.step = 3;
+                    this.currentModule = -1;
+                    this.updatePrompt();
+                } else if (lower === 'show options' || lower === 'options') {
+                    await this.showOptions();
+                    if (this.step === 4) this.step = 5;
+                } else if (lower.startsWith('set rhosts')) {
+                    if (lower.includes('10.10.10.10')) {
+                        await this.printLine('RHOSTS => 10.10.10.10');
+                        this.step = 6;
+                    } else {
+                        const ip = cmd.split(/\s+/)[2];
+                        await this.printLine(`RHOSTS => ${ip}`);
+                        this.step = 6;
+                    }
+                } else if (lower.startsWith('set')) {
+                    const parts = cmd.split(/\s+/);
+                    if (parts.length >= 3) {
+                        await this.printLine(`${parts[1]} => ${parts.slice(2).join(' ')}`);
+                    }
+                } else if (lower === 'exploit' || lower === 'run') {
+                    if (this.currentModule === 2) {
+                        await this.runExploit();
+                        this.shellMode = true;
+                        this.msfMode = false;
+                        this.step = 7;
+                        this.updatePrompt();
+                    } else if (this.currentModule === 0) {
+                        await this.runFailedExploit1();
+                    } else if (this.currentModule === 1) {
+                        await this.runFailedExploit2();
+                    }
+                } else if (lower.startsWith('use')) {
+                    if (lower.includes('vsftpd_234_backdoor') || lower.includes('use 2')) {
+                        this.currentModule = 2;
+                    } else if (lower.includes('0') || lower.includes('auth_bypass')) {
+                        this.currentModule = 0;
+                    } else if (lower.includes('1') || lower.includes('download_exec')) {
+                        this.currentModule = 1;
+                    }
+                    this.updatePrompt();
+                } else if (lower.startsWith('search') && lower.includes('vsftpd')) {
+                    await this.searchModules();
+                } else if (lower.startsWith('show')) {
+                    await this.printLine('');
+                } else {
+                    await this.printLine(`[-] Unknown command: ${cmd}.`);
+                }
+            }
+
             async runNmapScan() {
-                // Nmap shows initial message, then waits, then dumps everything at once
                 await this.printLine('Starting Nmap 7.94 ( https://nmap.org ) at 2025-11-25 13:00 CST');
                 await this.printLine('Please wait while Nmap is scanning... (Press Enter to view progress)');
                 
-                // Set scanning state
                 this.nmapScanning = true;
                 this.nmapStartTime = Date.now();
-                this.nmapTotalTime = 5200 + Math.random() * 5200; // 5.2-10.4 seconds (30% longer)
+                this.nmapTotalTime = 5200 + Math.random() * 5200;
                 this.nmapProgress = 0;
                 
-                // Temporarily unlock input so user can hit enter to see progress
                 this.unlockInput();
-                
-                // Simulate scanning delay with realistic variation
                 await this.sleep(this.nmapTotalTime);
-                
-                // Lock input again and finish scan
                 this.lockInput();
                 this.nmapScanning = false;
                 
-                // Then dump all results at once
                 await this.printLine('Nmap scan report for 10.10.10.10');
                 await this.printLine('Host is up (0.00021s latency).');
                 await this.printLine('Not shown: 997 filtered tcp ports (no-response)');
@@ -887,14 +875,12 @@ Type 'exit' to return to Metasploit.`
             }
 
             async startMetasploit() {
-                // Show loading message
                 const loadingLine = document.createElement('div');
                 loadingLine.className = 'output-line';
                 loadingLine.textContent = 'Loading Metasploit Framework...';
                 this.output.appendChild(loadingLine);
                 this.scrollToBottom();
                 
-                // Simulate loading time with variation (1.5-4 seconds)
                 const loadTime = 1500 + Math.random() * 2500;
                 await this.sleep(loadTime);
                 
@@ -934,25 +920,11 @@ Type 'exit' to return to Metasploit.`
                 await this.printLine('');
                 await this.printLine('   Name    Current Setting  Required  Description');
                 await this.printLine('   ----    ---------------  --------  -----------');
-                await this.printLine('   RHOSTS                   yes       The target host(s), see https://docs.metasploit.com/docs/using-metasploit/basics/using-metasploit.html');
-                await this.printLine('   RPORT   21               yes       The target port (TCP)');
-                await this.printLine('');
-                await this.printLine('');
-                await this.printLine('Exploit target:');
-                await this.printLine('');
-                await this.printLine('   Id  Name');
-                await this.printLine('   --  ----');
-                await this.printLine('   0   Automatic');
-                await this.printLine('');
-            }
-
-            async showOptionsWithRHOSTS() {
-                await this.printLine('');
-                await this.printLine('Module options (exploit/unix/ftp/vsftpd_234_backdoor):');
-                await this.printLine('');
-                await this.printLine('   Name    Current Setting  Required  Description');
-                await this.printLine('   ----    ---------------  --------  -----------');
-                await this.printLine('   RHOSTS  10.10.10.10      yes       The target host(s), see https://docs.metasploit.com/docs/using-metasploit/basics/using-metasploit.html');
+                if (this.step >= 6) {
+                    await this.printLine('   RHOSTS  10.10.10.10      yes       The target host(s), see https://docs.metasploit.com/docs/using-metasploit/basics/using-metasploit.html');
+                } else {
+                    await this.printLine('   RHOSTS                   yes       The target host(s), see https://docs.metasploit.com/docs/using-metasploit/basics/using-metasploit.html');
+                }
                 await this.printLine('   RPORT   21               yes       The target port (TCP)');
                 await this.printLine('');
                 await this.printLine('');
@@ -965,7 +937,6 @@ Type 'exit' to return to Metasploit.`
             }
 
             async runExploit() {
-                // First 3 - slow (1-3 seconds each)
                 await this.printLine('[*] Started reverse TCP handler on 192.168.1.100:4444');
                 await this.sleep(1000 + Math.random() * 2000);
                 await this.printLine('[*] 10.10.10.10:21 - Attempting to connect to FTP service...');
@@ -973,11 +944,9 @@ Type 'exit' to return to Metasploit.`
                 await this.printLine('[*] 10.10.10.10:21 - Connected to target FTP server');
                 await this.sleep(1000 + Math.random() * 2000);
                 
-                // Next 2 - instant
                 await this.printLine('[*] 10.10.10.10:21 - Banner: 220 (vsFTPd 2.3.4)');
                 await this.printLine('[*] 10.10.10.10:21 - Sending username with trigger...');
                 
-                // Next 4 - less slow (500ms-1.5s each)
                 await this.sleep(500 + Math.random() * 1000);
                 await this.printLine('[*] 10.10.10.10:21 - 331 Please specify the password.');
                 await this.sleep(500 + Math.random() * 1000);
@@ -987,7 +956,6 @@ Type 'exit' to return to Metasploit.`
                 await this.sleep(500 + Math.random() * 1000);
                 await this.printLine('[+] 10.10.10.10:21 - Backdoor triggered successfully!');
                 
-                // Last bunch - instant
                 await this.printLine('[*] 10.10.10.10:21 - Attempting to connect to backdoor shell on port 6200...');
                 await this.printLine('[+] 10.10.10.10:21 - Connection established');
                 await this.printLine('[*] 10.10.10.10:21 - Verifying shell access...');
@@ -1067,23 +1035,17 @@ Type 'exit' to return to Metasploit.`
                         await this.printLine('Desktop  Documents  Downloads  Music  Pictures  Videos');
                     } else if (this.currentDir === '/root/Downloads') {
                         await this.printLine('root.txt');
-                    } else {
-                        // Empty directory
                     }
                 } else if (lower.startsWith('cat root.txt') || lower.startsWith('cat /root/Downloads/root.txt')) {
                     await this.sleep(200);
                     await this.printLine('');
-                    await this.printLine('╔═══════════════════════════════════════════════════════╗');
-                    await this.printLine('║                                                       ║');
-                    await this.printLine('║               🏁 CONGRATULATIONS! 🏁                  ║');
-                    await this.printLine('║                                                       ║');
-                    await this.printLine('║     You have successfully compromised the target!     ║');
-                    await this.printLine('║                                                       ║');
-                    await this.printLine('║     FLAG: METASIM{y0u_4r3_4_h4ck3r_n0w}              ║');
-                    await this.printLine('║                                                       ║');
-                    await this.printLine('║           MetaSim Training Complete ✓                 ║');
-                    await this.printLine('║                                                       ║');
-                    await this.printLine('╚═══════════════════════════════════════════════════════╝');
+                    await this.printLine('               🏁 CONGRATULATIONS! 🏁');
+                    await this.printLine('');
+                    await this.printLine('     You have successfully compromised the target!');
+                    await this.printLine('');
+                    await this.printLine('     FLAG: METASIM{y0u_4r3_4_h4ck3r_n0w}');
+                    await this.printLine('');
+                    await this.printLine('           MetaSim Training Complete ✓');
                     await this.printLine('');
                 } else if (lower === 'hostname') {
                     await this.printLine('metasploitable');
@@ -1099,32 +1061,6 @@ Type 'exit' to return to Metasploit.`
                     await this.printLine('root:$6$abc123$xyz789:17000:0:99999:7:::');
                     await this.printLine('daemon:*:17000:0:99999:7:::');
                     await this.printLine('bin:*:17000:0:99999:7:::');
-                } else if (lower.startsWith('curl')) {
-                    await this.sleep(600);
-                    await this.printLine('curl: (6) Could not resolve host: connection timed out');
-                } else if (lower.startsWith('wget')) {
-                    await this.sleep(500);
-                    await this.printLine('--2025-11-25 13:10:42--  (trying to connect)');
-                    await this.sleep(800);
-                    await this.printLine('Failed to connect: Network is unreachable');
-                } else if (lower.startsWith('find')) {
-                    await this.sleep(400);
-                    if (lower.includes('root.txt')) {
-                        await this.printLine('/root/Downloads/root.txt');
-                    } else {
-                        await this.printLine('/root');
-                        await this.printLine('/root/Desktop');
-                        await this.printLine('/root/Documents');
-                        await this.printLine('/root/Downloads');
-                    }
-                } else if (lower.startsWith('grep')) {
-                    await this.sleep(300);
-                    await this.printLine('grep: missing operand');
-                } else if (lower === 'env' || lower === 'printenv') {
-                    await this.printLine('PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin');
-                    await this.printLine('HOME=/root');
-                    await this.printLine('SHELL=/bin/sh');
-                    await this.printLine('USER=root');
                 } else if (lower === 'date') {
                     await this.printLine('Mon Nov 25 13:10:45 CST 2025');
                 } else if (lower === 'uptime') {
@@ -1138,17 +1074,6 @@ Type 'exit' to return to Metasploit.`
                     await this.printLine('root         1  0.0  0.1   2872  1436 ?        Ss   12:00   0:01 init');
                     await this.printLine('root       523  0.0  0.1   5316  1576 ?        Ss   12:00   0:00 /usr/sbin/sshd');
                     await this.printLine('root      1337  0.0  0.0   1234   567 ?        S    13:05   0:00 vsftpd');
-                } else if (lower.startsWith('ifconfig') || lower === 'ip a') {
-                    await this.sleep(300);
-                    await this.printLine('eth0      Link encap:Ethernet  HWaddr 00:0c:29:3e:2f:4a');
-                    await this.printLine('          inet addr:10.10.10.10  Bcast:10.10.10.255  Mask:255.255.255.0');
-                    await this.printLine('          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1');
-                } else if (lower === 'netstat -tulpn' || lower === 'netstat') {
-                    await this.sleep(400);
-                    await this.printLine('Active Internet connections (only servers)');
-                    await this.printLine('Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program');
-                    await this.printLine('tcp        0      0 0.0.0.0:21              0.0.0.0:*               LISTEN      1337/vsftpd');
-                    await this.printLine('tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      523/sshd');
                 } else {
                     await this.printLine(`sh: ${cmd}: not found`);
                 }
@@ -1173,12 +1098,10 @@ Type 'exit' to return to Metasploit.`
 
         const terminal = new Terminal();
 
-        // Auto-focus on tap
         document.addEventListener('click', () => {
             terminal.input.focus();
         });
 
-        // Prevent zoom
         document.addEventListener('touchmove', (e) => {
             if (e.scale !== 1) e.preventDefault();
         }, { passive: false });
